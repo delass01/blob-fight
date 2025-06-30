@@ -1,125 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>City Blob Fight</title>
+  <meta charset="UTF-8">
+  <title>Blob Fight - Zombie City</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #222;
-    }
-    canvas {
-      display: block;
-    }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    canvas { display: block; margin: 0 auto; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 </head>
 <body>
 <script>
-class CityScene extends Phaser.Scene {
-  constructor() {
-    super('CityScene');
-  }
-
-  preload() {
-    this.load.image('player', 'https://i.imgur.com/tkYvK4F.png'); // blob
-    this.load.image('zombie', 'https://i.imgur.com/NuAvNNo.png'); // petit bonhomme
-    this.load.image('building', 'https://i.imgur.com/MqmnqVL.png');
-    this.load.image('map', 'https://i.imgur.com/6SglJDI.jpg'); // fond style urbain
-  }
-
-  create() {
-    const mapSize = 3000;
-
-    // Large background
-    this.add.tileSprite(0, 0, mapSize, mapSize, 'map').setOrigin(0);
-
-    // Buildings
-    this.buildings = this.physics.add.staticGroup();
-    for (let i = 0; i < 15; i++) {
-      const b = this.buildings.create(
-        Phaser.Math.Between(100, mapSize - 100),
-        Phaser.Math.Between(100, mapSize - 100),
-        'building'
-      );
-      b.setScale(0.5).refreshBody();
-    }
-
-    // Player
-    this.player = this.physics.add.sprite(400, 300, 'player').setScale(0.6);
-    this.player.setCollideWorldBounds(true);
-
-    // Camera follow
-    this.cameras.main.setBounds(0, 0, mapSize, mapSize);
-    this.cameras.main.startFollow(this.player);
-
-    // Controls
-    this.cursors = this.input.keyboard.createCursorKeys();
-
-    // Zombies (bots)
-    this.zombies = this.physics.add.group();
-    for (let i = 0; i < 20; i++) {
-      const z = this.zombies.create(
-        Phaser.Math.Between(100, mapSize - 100),
-        Phaser.Math.Between(100, mapSize - 100),
-        'zombie'
-      );
-      z.setScale(0.5);
-      z.setVelocity(
-        Phaser.Math.Between(-40, 40),
-        Phaser.Math.Between(-40, 40)
-      );
-    }
-
-    // Collisions
-    this.physics.add.collider(this.player, this.buildings);
-    this.physics.add.collider(this.zombies, this.buildings);
-    this.physics.add.overlap(this.player, this.zombies, this.eatZombie, null, this);
-  }
-
-  eatZombie(player, zombie) {
-    zombie.destroy();
-    player.setScale(player.scale + 0.02); // Grossit
-  }
-
-  update() {
-    const speed = 200;
-    this.player.setVelocity(0);
-
-    if (this.cursors.left.isDown) this.player.setVelocityX(-speed);
-    if (this.cursors.right.isDown) this.player.setVelocityX(speed);
-    if (this.cursors.up.isDown) this.player.setVelocityY(-speed);
-    if (this.cursors.down.isDown) this.player.setVelocityY(speed);
-
-    // Zombie movement
-    this.zombies.getChildren().forEach(z => {
-      if (Phaser.Math.Between(0, 100) < 1) {
-        z.setVelocity(
-          Phaser.Math.Between(-40, 40),
-          Phaser.Math.Between(-40, 40)
-        );
-      }
-    });
-  }
-}
-
 const config = {
   type: Phaser.AUTO,
-  width: window.innerWidth,
-  height: window.innerHeight,
+  width: 800,
+  height: 600,
   physics: {
     default: 'arcade',
     arcade: {
-      debug: false,
-    },
+      debug: false
+    }
   },
-  scene: CityScene,
+  scene: {
+    preload: preload,
+    create: create,
+    update: update
+  }
 };
 
-new Phaser.Game(config);
+let player;
+let zombies;
+let cursors;
+let buildings;
+let playerSize = 1;
+
+const game = new Phaser.Game(config);
+
+function preload() {
+  this.load.spritesheet('player', 'assets/green_blob_walk.png', { frameWidth: 32, frameHeight: 32 });
+  this.load.spritesheet('zombie', 'assets/zombie_walk_sheet_0.png', { frameWidth: 32, frameHeight: 32 });
+  this.load.image('road', 'assets/tile_road.png');
+  this.load.image('building', 'assets/building_topdown_0.png');
+}
+
+function create() {
+  // Sol
+  for (let x = 0; x < 800; x += 64) {
+    for (let y = 0; y < 600; y += 64) {
+      this.add.image(x, y, 'road').setOrigin(0);
+    }
+  }
+
+  // Animations
+  this.anims.create({
+    key: 'walk',
+    frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+    frameRate: 6,
+    repeat: -1
+  });
+  this.anims.create({
+    key: 'zwalk',
+    frames: this.anims.generateFrameNumbers('zombie', { start: 0, end: 3 }),
+    frameRate: 6,
+    repeat: -1
+  });
+
+  // Joueur
+  player = this.physics.add.sprite(400, 300, 'player').play('walk');
+  player.setCollideWorldBounds(true);
+
+  // Zombies
+  zombies = this.physics.add.group();
+  for (let i = 0; i < 10; i++) {
+    const x = Phaser.Math.Between(50, 750);
+    const y = Phaser.Math.Between(50, 550);
+    let z = zombies.create(x, y, 'zombie').play('zwalk');
+    z.setVelocity(Phaser.Math.Between(-50, 50), Phaser.Math.Between(-50, 50));
+    z.setBounce(1).setCollideWorldBounds(true);
+  }
+
+  // Bâtiments
+  buildings = this.physics.add.staticGroup();
+  buildings.create(200, 200, 'building');
+  buildings.create(600, 400, 'building');
+
+  this.physics.add.collider(player, buildings);
+  this.physics.add.collider(zombies, buildings);
+  this.physics.add.collider(zombies, zombies);
+
+  // Manger zombies
+  this.physics.add.overlap(player, zombies, (player, zombie) => {
+    zombie.destroy();
+    playerSize += 0.05;
+    player.setScale(playerSize);
+  });
+
+  cursors = this.input.keyboard.createCursorKeys();
+
+  // Mobile touch
+  this.input.addPointer(1);
+}
+
+function update() {
+  let speed = 160;
+  player.setVelocity(0);
+
+  if (cursors.left.isDown) {
+    player.setVelocityX(-speed);
+  } else if (cursors.right.isDown) {
+    player.setVelocityX(speed);
+  }
+
+  if (cursors.up.isDown) {
+    player.setVelocityY(-speed);
+  } else if (cursors.down.isDown) {
+    player.setVelocityY(speed);
+  }
+
+  // Mobile input
+  if (this.input.pointer1.isDown) {
+    const dx = this.input.pointer1.x - player.x;
+    const dy = this.input.pointer1.y - player.y;
+    const angle = Math.atan2(dy, dx);
+    player.setVelocityX(Math.cos(angle) * speed);
+    player.setVelocityY(Math.sin(angle) * speed);
+  }
+}
 </script>
 </body>
 </html>
